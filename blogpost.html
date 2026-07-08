@@ -1,0 +1,180 @@
+<article>
+<h1>Simple Power Plan Manager: The Complete Windows Power Plan Guide</h1>
+Windows power plans control how your PC balances performance, power draw, heat, and battery life. Managing them through old Control Panel pages and <strong>powercfg</strong> commands is slow and easy to get wrong. Simple Power Plan Manager is a small, native Windows app that puts every common power plan action in one clean window.
+
+In this guide, we walk through the whole app: viewing installed plans, switching the active plan, importing and exporting <strong>.pow</strong> files, downloading the FPSHEAVEN AMD or INTEL power plan, renaming and duplicating plans, deleting them safely, and restoring missing Windows defaults.
+
+The goal is simple: make the everyday power plan workflow faster and clearer, without forcing you to memorize commands or dig through nested Windows menus.
+
+<strong>Important:</strong> Simple Power Plan Manager only changes the plans you tell it to. It never silently alters your hardware settings. Every switch, export, rename, and delete is an action you click.
+
+<strong>Backup note:</strong> Before making bigger changes, use Export All to save every plan as a .pow backup. A backup is your one-click route back to a known-good setup, especially before deleting plans, replacing tuned FPSHEAVEN profiles, or restoring defaults.
+<h2>What Is a Windows Power Plan?</h2>
+A power plan is a saved collection of hardware and system settings, such as display and sleep timeouts, processor power states, USB behavior, and PCIe power management. Windows uses the active plan to decide how aggressively your PC chases performance versus how much it tries to save power.
+
+Many people keep several plans: a balanced profile for everyday use, a high performance profile for gaming or heavy work, and a low-power profile for quiet operation or battery life. The plans themselves are useful. The friction is in managing them, and that is exactly what this app removes.
+
+<strong>Reminder:</strong> After a Windows reset, driver update, or on trimmed-down systems, default plans like High performance or Ultimate Performance can be missing entirely. Simple Power Plan Manager can bring them back, with an extra confirmation step before any full Windows power-plan reset.
+<h2>Power Plan Terminology</h2>
+<h3 style="margin-top: 0; margin-bottom: 8px;">Power Plan</h3>
+<p style="margin: 0; color: #555;">A saved bundle of power and performance settings that Windows applies as a single profile. Switching plans changes how your hardware behaves without touching each setting individually.</p>
+
+<h3 style="margin-top: 0; margin-bottom: 8px;">Active Plan</h3>
+<p style="margin: 0; color: #555;">The plan currently in effect. In the app it is clearly tagged ACTIVE in green, so you always know which profile Windows is running.</p>
+
+<h3 style="margin-top: 0; margin-bottom: 8px;">GUID</h3>
+<p style="margin: 0; color: #555;">The unique identifier Windows assigns to every power plan. The app shows the GUID of the selected plan, which is useful when scripting or matching plans across machines.</p>
+
+<h3 style="margin-top: 0; margin-bottom: 8px;">.pow File</h3>
+<p style="margin: 0; color: #555;">The standard Windows export format for a single power plan. Export creates one; import loads it back in. It is ideal for backups or sharing a tuned profile with another PC.</p>
+
+<h3 style="margin-top: 0; margin-bottom: 8px;">Default Plans</h3>
+<p style="margin: 0; color: #555;">The built-in Windows plans: Balanced, High performance, Power saver, and Ultimate Performance. Some are hidden or absent on certain systems until they are restored.</p>
+
+<h3 style="margin-top: 0; margin-bottom: 8px;">Duplicate</h3>
+<p style="margin: 0; color: #555;">A copy of an existing plan with a new GUID. Duplicating before tweaking lets you experiment freely while the original profile stays untouched.</p>
+
+<h3 style="margin-top: 0; margin-bottom: 8px;">Description</h3>
+<p style="margin: 0; color: #555;">A short note attached to a plan. Clear names and descriptions make a long plan list easy to understand at a glance.</p>
+<strong>Important:</strong> The GUID is how Windows truly identifies a plan, not the name. Two plans can share a friendly name but always have different GUIDs. When in doubt, check the GUID shown in the details panel.
+<h2>Getting the App</h2>
+Simple Power Plan Manager ships as a single, portable Windows app. There is no installer and nothing running in the background.
+
+Download the latest version here:
+
+<a style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; margin: 12px 0; padding: 10px 14px; border-radius: 8px; background: #111; color: #fff; text-decoration: none; align-self: flex-start;" href="https://github.com/fpsheaven/Simple-Power-Plan-Manager/releases/tag/v1.1" target="_blank" rel="noopener">Download Simple Power Plan Manager</a>
+
+After downloading, open the app and Windows will load your current power plans automatically.
+
+<strong>Note:</strong> Some power plan actions may require administrator permissions depending on your Windows configuration and system policy. If an action reports that it needs more rights, run the app as administrator.
+<h2>First Launch</h2>
+Open the app. The window is split in two: a list of installed plans on the left, and a details panel on the right that shows the selected plan's name, GUID, description, and available actions. The active plan is tagged ACTIVE in green.
+
+<img style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0;" src="https://i.imgur.com/WkOmEj4.png" alt="Main dashboard of Simple Power Plan Manager showing the plan list, the active plan, and plan details" />
+
+If you ever change plans outside the app, press Refresh to reload the list from Windows.
+<h2>Viewing and Activating Plans</h2>
+Every installed plan is listed the moment the app opens. Click a plan to select it, then look at the right panel for its details and actions.
+
+To switch the active plan, select it and press Activate. There is no Control Panel round-trip. This is the fastest way to hop between a daily, a performance, and a quiet profile.
+
+The actions available for a selected plan are Activate, Duplicate, Activate &amp; Edit, Export, and Delete. The active plan cannot be deleted, which prevents you from removing the profile your system is currently using.
+<h2>Importing and Exporting .pow Files</h2>
+Windows plans can be saved as .pow files. Use Import to load one or more tuned profiles straight into Windows, and the Export options to back them up. This is perfect before a reinstall or for sharing a profile.
+
+To import, press Import and select one or more .pow files in the native Windows picker.
+
+To back up everything at once, press Export All and choose a folder. The app writes every installed plan into that folder as a separate .pow file.
+
+<img style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0;" src="https://i.imgur.com/iyA1gGS.png" alt="Exporting power plans as .pow backup files in Simple Power Plan Manager" />
+
+To save just one plan, select it and press Export Selected. The app suggests a sensible file name based on the plan name.
+
+<h2>Downloading the FPSHEAVEN AMD or INTEL Power Plan</h2>
+The toolbar also includes <strong>Download FPSHEAVEN's power plan</strong>. Press it and choose <strong>INTEL</strong> or <strong>AMD</strong>. The app downloads the latest FPSHEAVEN power-plan zip, extracts it to your Desktop, imports the matching .pow file, and activates the newly imported plan.
+
+If a FPSHEAVEN plan is already active, the app first activates another available plan, deletes the old active FPSHEAVEN plan, then imports and activates the selected AMD or INTEL version. That keeps the list clean and avoids stacking multiple active-generation FPSHEAVEN profiles.
+
+<strong>Backup note:</strong> Run Export All before any bigger change. If something goes wrong, a quick Import restores your plans exactly as they were.
+<h2>Renaming, Describing, and Duplicating</h2>
+Give plans clear names and descriptions so each profile explains what it is tuned for. Select a plan, edit the name and description fields, then press Save to write the changes back to Windows.
+
+Before experimenting with a plan, press Duplicate first. Copying a plan creates a new GUID, so you can tweak the copy freely while the original stays exactly as it was.
+
+<strong>Tip:</strong> Name your duplicates clearly, for example "Gaming (test)" or "Quiet night profile", so a long list stays easy to read weeks later.
+<h2>Deleting Plans Safely</h2>
+Plans you no longer need can be removed with Delete, but never by accident. A confirmation dialog names the plan and warns that it will be removed from Windows before anything happens.
+
+<img style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0;" src="https://i.imgur.com/2bxXFKI.png" alt="Delete power plan confirmation dialog in Simple Power Plan Manager" />
+<strong>Important:</strong> You cannot delete the active plan. Activate a different plan first, then delete the one you no longer want. Deleting a plan is permanent, so keep a .pow backup if you might need it again.
+<h2>Restoring Missing Windows Defaults</h2>
+If Windows is missing its built-in plans, press Restore Defaults to bring them back. This covers Balanced, High performance, Power saver, and Ultimate Performance. It is handy on fresh installs and trimmed-down systems where some of these are hidden or absent.
+
+The app takes the safe route first. It tries to restore missing defaults without touching your custom plans. If Windows requires a full reset to recover a missing built-in plan, the app shows a Reset Anyway confirmation before continuing. During that full reset path, custom plans are exported first and re-imported afterward. If any re-import fails, the backup folder is kept and shown in the error message.
+
+<strong>Reminder:</strong> Export All first. Restoring defaults can become a larger operation on some systems, so a fresh backup means you can always return to your previous setup if you change your mind.
+<h2>Opening Advanced Power Settings</h2>
+When you need the full, fine-grained Windows controls, press Activate &amp; Edit. The app activates the selected plan and opens the native Windows advanced power settings for it.
+
+From here you can adjust the deep settings that are not exposed directly in the app, such as processor power management, sleep behavior, and PCIe link state power management.
+<h2>Recommended Workflow</h2>
+A safe routine for getting a tidy, tuned setup without risking your current configuration:
+<ol>
+ 	<li>Open the app and confirm which plan is currently active.</li>
+ 	<li>Press Export All to back up every plan before making changes.</li>
+ 	<li>Use Download FPSHEAVEN's power plan if you want the latest AMD or INTEL FPSHEAVEN profile imported and activated automatically.</li>
+ 	<li>Duplicate a plan if you want to experiment, so the original stays safe.</li>
+ 	<li>Rename the copy and add a description so it is easy to identify later.</li>
+ 	<li>Activate the plan you want to use.</li>
+ 	<li>Use Activate &amp; Edit only when you need Windows' advanced settings.</li>
+ 	<li>Delete leftover test plans you no longer need.</li>
+</ol>
+<h2>Action Reference</h2>
+A quick map of every control in the app and what it does:
+<table style="width: 100%; border-collapse: collapse; margin: 22px 0;">
+<thead>
+<tr>
+<th style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top; background: #f7f7f7;">Action</th>
+<th style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top; background: #f7f7f7;">What It Does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Refresh</td>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Reloads the plan list from Windows.</td>
+</tr>
+<tr>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Activate</td>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Sets the selected plan as the active Windows plan.</td>
+</tr>
+<tr>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Duplicate</td>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Creates a copy of a plan, with a new GUID, for safe editing.</td>
+</tr>
+<tr>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Import</td>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Loads one or more .pow power plan files into Windows.</td>
+</tr>
+<tr>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Download FPSHEAVEN's power plan</td>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Downloads the FPSHEAVEN power-plan zip, asks for AMD or INTEL, imports the matching plan, replaces an active old FPSHEAVEN plan if needed, and activates the new one.</td>
+</tr>
+<tr>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Export Selected / All</td>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Saves the selected plan, or every plan, as .pow backup files.</td>
+</tr>
+<tr>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Rename / Description</td>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Updates the friendly name and description of a plan.</td>
+</tr>
+<tr>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Restore Defaults</td>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Restores missing built-in Windows power plans safely first, then asks before any full reset path.</td>
+</tr>
+<tr>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Activate &amp; Edit</td>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Activates the plan and opens Windows' advanced power settings.</td>
+</tr>
+<tr>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Delete</td>
+<td style="border: 1px solid #e5e5e5; padding: 10px 12px; text-align: left; vertical-align: top;">Removes a plan from Windows after a confirmation prompt.</td>
+</tr>
+</tbody>
+</table>
+<h2>The Process</h2>
+The basic workflow for keeping a clean, reliable set of power plans is:
+<ol>
+ 	<li>Back up everything with Export All.</li>
+ 	<li>Restore any missing defaults you actually use.</li>
+ 	<li>Download and activate the FPSHEAVEN AMD or INTEL plan if you want the ready-made tuned profile.</li>
+ 	<li>Duplicate before tweaking, and rename copies clearly.</li>
+ 	<li>Activate the plan you want as your daily profile.</li>
+ 	<li>Delete leftover test plans, keeping a .pow backup of anything you might want again.</li>
+</ol>
+<strong>TL;DR:</strong> Export All for safety, Activate to switch in one click, Import to load tuned profiles, Download FPSHEAVEN's power plan for the AMD or INTEL profile, Duplicate before experimenting, Restore Defaults to recover missing plans safely, and Delete what you do not need.
+
+<strong>Important:</strong> The app makes Windows power plans easier to manage, but it does not replace tuning the rest of your system. For real, end-to-end responsiveness you also want a stable CPU, memory, and BIOS setup.
+
+For CPU-side overclocking and stability testing, read our <a href="https://fpsheaven.com/am5-fclk-overclocking-guide/">AM5 Infinity Fabric – FCLK overclocking and stability testing</a> guide, or book a <a href="https://fpsheaven.com/consults/">BIOS consult</a> and let us do the work for you.
+
+</article>
