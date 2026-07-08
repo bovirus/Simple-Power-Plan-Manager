@@ -66,11 +66,13 @@ const DEFAULT_POWER_PLANS: &[DefaultPowerPlan] = &[
 
 const YOUTUBE_CHANNEL_URL: &str = "https://www.youtube.com/@fpsheaven";
 const FPSHEAVEN_POWER_PLANS_URL: &str =
-    "https://fpsheaven.com/wp-content/uploads/2026/06/fpsheaven_powerplans.zip";
+    "https://cdn.shopify.com/s/files/1/0952/7318/9642/files/fpsheaven_powerplans.zip?v=1783515348";
 const FPSHEAVEN_POWER_PLANS_ZIP_FILE: &str = "fpsheaven_powerplans.zip";
 const FPSHEAVEN_POWER_PLANS_FOLDER: &str = "FPSHEAVEN Power Plans";
 const APP_DATA_FOLDER: &str = "Simple Power Plan Manager";
 const FPSHEAVEN_DOWNLOADS_FOLDER: &str = "FPSHEAVEN Downloads";
+const DOWNLOAD_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+const DOWNLOAD_ATTEMPTS: usize = 3;
 const TOOLBAR_BUTTON_HEIGHT: f32 = 30.0;
 const FPSHEAVEN_IMPORT_BUSY_MESSAGE: &str =
     "FPSHEAVEN power plan import is running; wait for it to finish";
@@ -1304,7 +1306,7 @@ fn download_extract_and_import_fpsheaven_power_plan(
     let zip_path = download_dir.join(FPSHEAVEN_POWER_PLANS_ZIP_FILE);
     let extract_dir = download_dir.join(FPSHEAVEN_POWER_PLANS_FOLDER);
 
-    download_file(FPSHEAVEN_POWER_PLANS_URL, &zip_path)?;
+    download_and_verify_zip(FPSHEAVEN_POWER_PLANS_URL, &zip_path)?;
     extract_zip(&zip_path, &extract_dir)?;
 
     let plan_path = find_fpsheaven_power_plan(&extract_dir, plan_kind)?;
@@ -1347,6 +1349,29 @@ fn fpsheaven_download_dir_under(base_dir: &Path) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+fn download_and_verify_zip(url: &str, destination: &Path) -> Result<(), String> {
+    let mut last_error = String::new();
+
+    for attempt in 1..=DOWNLOAD_ATTEMPTS {
+        let _ = fs::remove_file(destination);
+
+        match download_file(url, destination).and_then(|()| verify_zip_file(destination)) {
+            Ok(()) => return Ok(()),
+            Err(error) => {
+                last_error = error;
+                if attempt < DOWNLOAD_ATTEMPTS {
+                    thread::sleep(Duration::from_millis(1000));
+                }
+            }
+        }
+    }
+
+    let _ = fs::remove_file(destination);
+    Err(format!(
+        "Could not download the FPSHEAVEN power plans after {DOWNLOAD_ATTEMPTS} attempts.\n{last_error}"
+    ))
+}
+
 fn download_file(url: &str, destination: &Path) -> Result<(), String> {
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent)
@@ -1356,12 +1381,39 @@ fn download_file(url: &str, destination: &Path) -> Result<(), String> {
     let script = format!(
         "$ErrorActionPreference = 'Stop'; \
          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-         Invoke-WebRequest -Uri {} -OutFile {} -UseBasicParsing",
+         Invoke-WebRequest -Uri {} -OutFile {} -UseBasicParsing -TimeoutSec 120 -UserAgent {}",
         ps_single_quote(url),
-        ps_single_quote_path(destination)
+        ps_single_quote_path(destination),
+        ps_single_quote(DOWNLOAD_USER_AGENT)
     );
 
     run_powershell_script(&script).map(|_| ())
+}
+
+/// Confirms the downloaded file is really a ZIP archive (starts with the `PK`
+/// local-file signature) rather than an HTML error/login page saved with a
+/// `.zip` name, which would otherwise fail later with a confusing extract error.
+fn verify_zip_file(path: &Path) -> Result<(), String> {
+    let metadata = fs::metadata(path)
+        .map_err(|error| format!("The download did not complete: {error}"))?;
+
+    if metadata.len() < 4 {
+        return Err(
+            "The download was empty or incomplete. Please check your internet connection and try again."
+                .to_owned(),
+        );
+    }
+
+    let bytes = fs::read(path).map_err(|error| format!("Could not read the download: {error}"))?;
+
+    if bytes.starts_with(b"PK") {
+        Ok(())
+    } else {
+        Err(
+            "The download did not return a valid .zip file (the server may have returned a web page instead). Please try again later."
+                .to_owned(),
+        )
+    }
 }
 
 fn extract_zip(zip_path: &Path, destination: &Path) -> Result<(), String> {
@@ -1380,7 +1432,18 @@ fn extract_zip(zip_path: &Path, destination: &Path) -> Result<(), String> {
         ps_single_quote_path(destination)
     );
 
-    run_powershell_script(&script).map(|_| ())
+    run_powershell_script(&script)?;
+
+    let produced_files = fs::read_dir(destination)
+        .map_err(|error| format!("Could not read the extract folder: {error}"))?
+        .next()
+        .is_some();
+
+    if produced_files {
+        Ok(())
+    } else {
+        Err("Extraction finished but produced no files. The download may be corrupt; please try again.".to_owned())
+    }
 }
 
 fn find_fpsheaven_power_plan(
@@ -2133,6 +2196,36 @@ mod tests {
         assert_eq!(args[2], OsString::from(guid));
 
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn verify_zip_file_accepts_zip_and_rejects_html() {
+        let folder = env::temp_dir().join(format!(
+            "pp_ui_verify_zip_test_{}_{}",
+            process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        ));
+        fs::create_dir_all(&folder).unwrap();
+
+        let zip_path = folder.join("real.zip");
+        fs::write(&zip_path, b"PK\x03\x04rest-of-archive").unwrap();
+        assert!(verify_zip_file(&zip_path).is_ok());
+
+        let html_path = folder.join("error.zip");
+        fs::write(&html_path, b"<!DOCTYPE html><html>Not found</html>").unwrap();
+        assert!(verify_zip_file(&html_path).is_err());
+
+        let empty_path = folder.join("empty.zip");
+        fs::write(&empty_path, b"").unwrap();
+        assert!(verify_zip_file(&empty_path).is_err());
+
+        let missing_path = folder.join("missing.zip");
+        assert!(verify_zip_file(&missing_path).is_err());
+
+        let _ = fs::remove_dir_all(folder);
     }
 
     #[test]
