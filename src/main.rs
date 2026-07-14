@@ -74,8 +74,6 @@ const FPSHEAVEN_DOWNLOADS_FOLDER: &str = "FPSHEAVEN Downloads";
 const DOWNLOAD_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const DOWNLOAD_ATTEMPTS: usize = 3;
 const TOOLBAR_BUTTON_HEIGHT: f32 = 30.0;
-const FPSHEAVEN_IMPORT_BUSY_MESSAGE: &str =
-    "FPSHEAVEN power plan import is running; wait for it to finish";
 
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
@@ -197,7 +195,650 @@ impl StatusMessage {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Language {
+    English,
+    German,
+    Spanish,
+    Italian,
+    Portuguese,
+    Turkish,
+    Danish,
+}
+
+impl Language {
+    const ALL: [Language; 7] = [
+        Language::English,
+        Language::German,
+        Language::Spanish,
+        Language::Italian,
+        Language::Portuguese,
+        Language::Turkish,
+        Language::Danish,
+    ];
+
+    fn native_name(self) -> &'static str {
+        match self {
+            Language::English => "English",
+            Language::German => "Deutsch",
+            Language::Spanish => "Español",
+            Language::Italian => "Italiano",
+            Language::Portuguese => "Português",
+            Language::Turkish => "Türkçe",
+            Language::Danish => "Dansk",
+        }
+    }
+
+    fn code(self) -> &'static str {
+        match self {
+            Language::English => "en",
+            Language::German => "de",
+            Language::Spanish => "es",
+            Language::Italian => "it",
+            Language::Portuguese => "pt",
+            Language::Turkish => "tr",
+            Language::Danish => "da",
+        }
+    }
+
+    fn from_code(code: &str) -> Option<Language> {
+        Language::ALL
+            .into_iter()
+            .find(|language| language.code() == code)
+    }
+
+    fn strings(self) -> &'static Tr {
+        match self {
+            Language::English => &EN,
+            Language::German => &DE,
+            Language::Spanish => &ES,
+            Language::Italian => &IT,
+            Language::Portuguese => &PT,
+            Language::Turkish => &TR,
+            Language::Danish => &DA,
+        }
+    }
+}
+
+const LANGUAGE_CONFIG_FILE: &str = "language.txt";
+
+fn language_config_path() -> Option<PathBuf> {
+    env::var_os("LOCALAPPDATA")
+        .map(|base| PathBuf::from(base).join(APP_DATA_FOLDER).join(LANGUAGE_CONFIG_FILE))
+}
+
+fn load_saved_language() -> Language {
+    language_config_path()
+        .and_then(|path| fs::read_to_string(path).ok())
+        .and_then(|code| Language::from_code(code.trim()))
+        .unwrap_or(Language::English)
+}
+
+fn save_language(language: Language) {
+    let Some(path) = language_config_path() else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::write(path, language.code());
+}
+
+/// Fills `{placeholder}` tokens in a (possibly translated) template string.
+fn fill(template: &str, replacements: &[(&str, &str)]) -> String {
+    let mut result = template.to_owned();
+    for (key, value) in replacements {
+        result = result.replace(key, value);
+    }
+    result
+}
+
+struct Tr {
+    language_label: &'static str,
+    refresh: &'static str,
+    restore_defaults: &'static str,
+    import: &'static str,
+    export_all: &'static str,
+    download_fpsheaven: &'static str,
+    youtube: &'static str,
+    selected: &'static str,
+    export: &'static str,
+    delete: &'static str,
+    power_plans: &'static str,
+    no_power_plans_found: &'static str,
+    select_a_power_plan: &'static str,
+    guid: &'static str,
+    name_and_description: &'static str,
+    active_badge: &'static str,
+    save: &'static str,
+    description_hint: &'static str,
+    activate: &'static str,
+    duplicate: &'static str,
+    activate_and_edit: &'static str,
+    import_dialog_title: &'static str,
+    import_dialog_prompt: &'static str,
+    cancel: &'static str,
+    reset_dialog_title: &'static str,
+    reset_line_1: &'static str,
+    reset_line_2: &'static str,
+    reset_line_3: &'static str,
+    original_error: &'static str,
+    reset_anyway: &'static str,
+    delete_dialog_title: &'static str,
+    delete_confirm: &'static str,
+    delete_removes_from_windows: &'static str,
+    power_plan_filter: &'static str,
+    import_power_plan_title: &'static str,
+    export_power_plan_title: &'static str,
+    choose_export_folder_title: &'static str,
+    ready: &'static str,
+    loaded_power_plans: &'static str,
+    refreshed_power_plans: &'static str,
+    import_busy: &'static str,
+    imported_success: &'static str,
+    imported_partial: &'static str,
+    select_plan_first: &'static str,
+    exported_to: &'static str,
+    no_plans_to_export: &'static str,
+    exported_all: &'static str,
+    exported_partial: &'static str,
+    activated: &'static str,
+    duplicated: &'static str,
+    plan_name_empty: &'static str,
+    updated: &'static str,
+    activate_before_delete: &'static str,
+    plan_no_longer_exists: &'static str,
+    deleted: &'static str,
+    opened_windows_editor: &'static str,
+    opened_youtube: &'static str,
+    could_not_open_youtube: &'static str,
+    defaults_already_available: &'static str,
+    import_already_running: &'static str,
+    downloading: &'static str,
+    import_stopped: &'static str,
+    imported_activated: &'static str,
+    replaced_suffix: &'static str,
+    windows_reset_canceled: &'static str,
+}
+
+const EN: Tr = Tr {
+    language_label: "Language",
+    refresh: "Refresh",
+    restore_defaults: "Restore Defaults",
+    import: "Import",
+    export_all: "Export All",
+    download_fpsheaven: "Download FPSHEAVEN's power plan",
+    youtube: "YouTube",
+    selected: "Selected",
+    export: "Export",
+    delete: "Delete",
+    power_plans: "Power Plans",
+    no_power_plans_found: "No power plans found",
+    select_a_power_plan: "Select a power plan",
+    guid: "GUID",
+    name_and_description: "Name and Description",
+    active_badge: "ACTIVE",
+    save: "Save",
+    description_hint: "Description",
+    activate: "Activate",
+    duplicate: "Duplicate",
+    activate_and_edit: "Activate & Edit",
+    import_dialog_title: "Download FPSHEAVEN's Power Plan",
+    import_dialog_prompt: "Hi, import INTEL or AMD?",
+    cancel: "Cancel",
+    reset_dialog_title: "Reset Windows Power Plans",
+    reset_line_1: "Windows needs a full power-plan reset to restore the missing defaults.",
+    reset_line_2: "Custom plans will be exported first, then re-imported after the reset.",
+    reset_line_3: "If any re-import fails, the backup folder will be kept and shown.",
+    original_error: "Original error",
+    reset_anyway: "Reset Anyway",
+    delete_dialog_title: "Delete Power Plan",
+    delete_confirm: "Delete \"{plan}\"?",
+    delete_removes_from_windows: "This removes the plan from Windows.",
+    power_plan_filter: "Power plan",
+    import_power_plan_title: "Import power plan",
+    export_power_plan_title: "Export power plan",
+    choose_export_folder_title: "Choose export folder",
+    ready: "Ready",
+    loaded_power_plans: "Loaded power plans",
+    refreshed_power_plans: "Refreshed power plans",
+    import_busy: "FPSHEAVEN power plan import is running; wait for it to finish",
+    imported_success: "Imported {count} power plan(s) successfully",
+    imported_partial: "Imported {count} power plan(s); {failed} failed\n{errors}",
+    select_plan_first: "Select a power plan first",
+    exported_to: "Exported \"{name}\" to {path}",
+    no_plans_to_export: "No power plans to export",
+    exported_all: "Exported {count} power plan(s) to {path}",
+    exported_partial: "Exported {count} power plan(s); {failed} failed\n{errors}",
+    activated: "Activated \"{name}\"",
+    duplicated: "Duplicated \"{name}\"",
+    plan_name_empty: "Plan name cannot be empty",
+    updated: "Updated \"{name}\"",
+    activate_before_delete: "Activate another plan before deleting this one",
+    plan_no_longer_exists: "Power plan no longer exists",
+    deleted: "Deleted \"{name}\"",
+    opened_windows_editor: "Opened Windows editor for \"{name}\"",
+    opened_youtube: "Opened @fpsheaven on YouTube",
+    could_not_open_youtube: "Could not open YouTube: {error}",
+    defaults_already_available: "Default Windows power plans are already available",
+    import_already_running: "FPSHEAVEN power plan import is already running",
+    downloading: "Downloading FPSHEAVEN {label} power plan...",
+    import_stopped: "FPSHEAVEN power plan import stopped unexpectedly",
+    imported_activated: "Imported and activated FPSHEAVEN {label} power plan from {path}",
+    replaced_suffix: "; replaced \"{name}\"",
+    windows_reset_canceled: "Windows default reset canceled",
+};
+
+const DE: Tr = Tr {
+    language_label: "Sprache",
+    refresh: "Aktualisieren",
+    restore_defaults: "Standard wiederherstellen",
+    import: "Importieren",
+    export_all: "Alle exportieren",
+    download_fpsheaven: "FPSHEAVEN-Energiesparplan herunterladen",
+    youtube: "YouTube",
+    selected: "Ausgewählt",
+    export: "Exportieren",
+    delete: "Löschen",
+    power_plans: "Energiesparpläne",
+    no_power_plans_found: "Keine Energiesparpläne gefunden",
+    select_a_power_plan: "Energiesparplan auswählen",
+    guid: "GUID",
+    name_and_description: "Name und Beschreibung",
+    active_badge: "AKTIV",
+    save: "Speichern",
+    description_hint: "Beschreibung",
+    activate: "Aktivieren",
+    duplicate: "Duplizieren",
+    activate_and_edit: "Aktivieren & bearbeiten",
+    import_dialog_title: "FPSHEAVEN-Energiesparplan herunterladen",
+    import_dialog_prompt: "Hallo, INTEL oder AMD importieren?",
+    cancel: "Abbrechen",
+    reset_dialog_title: "Windows-Energiesparpläne zurücksetzen",
+    reset_line_1: "Windows benötigt ein vollständiges Zurücksetzen der Energiesparpläne, um die fehlenden Standardpläne wiederherzustellen.",
+    reset_line_2: "Benutzerdefinierte Pläne werden zuerst exportiert und nach dem Zurücksetzen erneut importiert.",
+    reset_line_3: "Falls ein erneuter Import fehlschlägt, wird der Sicherungsordner beibehalten und angezeigt.",
+    original_error: "Ursprünglicher Fehler",
+    reset_anyway: "Trotzdem zurücksetzen",
+    delete_dialog_title: "Energiesparplan löschen",
+    delete_confirm: "\"{plan}\" löschen?",
+    delete_removes_from_windows: "Dadurch wird der Plan aus Windows entfernt.",
+    power_plan_filter: "Energiesparplan",
+    import_power_plan_title: "Energiesparplan importieren",
+    export_power_plan_title: "Energiesparplan exportieren",
+    choose_export_folder_title: "Exportordner auswählen",
+    ready: "Bereit",
+    loaded_power_plans: "Energiesparpläne geladen",
+    refreshed_power_plans: "Energiesparpläne aktualisiert",
+    import_busy: "Der Import des FPSHEAVEN-Energiesparplans läuft; warten Sie, bis er abgeschlossen ist",
+    imported_success: "{count} Energiesparplan/-pläne erfolgreich importiert",
+    imported_partial: "{count} Energiesparplan/-pläne importiert; {failed} fehlgeschlagen\n{errors}",
+    select_plan_first: "Wählen Sie zuerst einen Energiesparplan aus",
+    exported_to: "\"{name}\" nach {path} exportiert",
+    no_plans_to_export: "Keine Energiesparpläne zum Exportieren vorhanden",
+    exported_all: "{count} Energiesparplan/-pläne nach {path} exportiert",
+    exported_partial: "{count} Energiesparplan/-pläne exportiert; {failed} fehlgeschlagen\n{errors}",
+    activated: "\"{name}\" aktiviert",
+    duplicated: "\"{name}\" dupliziert",
+    plan_name_empty: "Der Planname darf nicht leer sein",
+    updated: "\"{name}\" aktualisiert",
+    activate_before_delete: "Aktivieren Sie einen anderen Plan, bevor Sie diesen löschen",
+    plan_no_longer_exists: "Energiesparplan existiert nicht mehr",
+    deleted: "\"{name}\" gelöscht",
+    opened_windows_editor: "Windows-Editor für \"{name}\" geöffnet",
+    opened_youtube: "@fpsheaven auf YouTube geöffnet",
+    could_not_open_youtube: "YouTube konnte nicht geöffnet werden: {error}",
+    defaults_already_available: "Die Windows-Standardenergiesparpläne sind bereits verfügbar",
+    import_already_running: "Der Import des FPSHEAVEN-Energiesparplans läuft bereits",
+    downloading: "FPSHEAVEN {label}-Energiesparplan wird heruntergeladen...",
+    import_stopped: "Der Import des FPSHEAVEN-Energiesparplans wurde unerwartet beendet",
+    imported_activated: "FPSHEAVEN {label}-Energiesparplan aus {path} importiert und aktiviert",
+    replaced_suffix: "; \"{name}\" ersetzt",
+    windows_reset_canceled: "Zurücksetzen der Windows-Standardpläne abgebrochen",
+};
+
+const ES: Tr = Tr {
+    language_label: "Idioma",
+    refresh: "Actualizar",
+    restore_defaults: "Restaurar predeterminados",
+    import: "Importar",
+    export_all: "Exportar todo",
+    download_fpsheaven: "Descargar el plan de energía de FPSHEAVEN",
+    youtube: "YouTube",
+    selected: "Seleccionado",
+    export: "Exportar",
+    delete: "Eliminar",
+    power_plans: "Planes de energía",
+    no_power_plans_found: "No se encontraron planes de energía",
+    select_a_power_plan: "Selecciona un plan de energía",
+    guid: "GUID",
+    name_and_description: "Nombre y descripción",
+    active_badge: "ACTIVO",
+    save: "Guardar",
+    description_hint: "Descripción",
+    activate: "Activar",
+    duplicate: "Duplicar",
+    activate_and_edit: "Activar y editar",
+    import_dialog_title: "Descargar el plan de energía de FPSHEAVEN",
+    import_dialog_prompt: "Hola, ¿importar INTEL o AMD?",
+    cancel: "Cancelar",
+    reset_dialog_title: "Restablecer los planes de energía de Windows",
+    reset_line_1: "Windows necesita un restablecimiento completo de los planes de energía para restaurar los predeterminados que faltan.",
+    reset_line_2: "Los planes personalizados se exportarán primero y luego se volverán a importar tras el restablecimiento.",
+    reset_line_3: "Si alguna reimportación falla, se conservará y mostrará la carpeta de copia de seguridad.",
+    original_error: "Error original",
+    reset_anyway: "Restablecer igualmente",
+    delete_dialog_title: "Eliminar plan de energía",
+    delete_confirm: "¿Eliminar \"{plan}\"?",
+    delete_removes_from_windows: "Esto elimina el plan de Windows.",
+    power_plan_filter: "Plan de energía",
+    import_power_plan_title: "Importar plan de energía",
+    export_power_plan_title: "Exportar plan de energía",
+    choose_export_folder_title: "Elige la carpeta de exportación",
+    ready: "Listo",
+    loaded_power_plans: "Planes de energía cargados",
+    refreshed_power_plans: "Planes de energía actualizados",
+    import_busy: "La importación del plan de energía de FPSHEAVEN está en curso; espera a que termine",
+    imported_success: "Se importaron {count} plan(es) de energía correctamente",
+    imported_partial: "Se importaron {count} plan(es) de energía; {failed} fallaron\n{errors}",
+    select_plan_first: "Selecciona primero un plan de energía",
+    exported_to: "Se exportó \"{name}\" a {path}",
+    no_plans_to_export: "No hay planes de energía para exportar",
+    exported_all: "Se exportaron {count} plan(es) de energía a {path}",
+    exported_partial: "Se exportaron {count} plan(es) de energía; {failed} fallaron\n{errors}",
+    activated: "Se activó \"{name}\"",
+    duplicated: "Se duplicó \"{name}\"",
+    plan_name_empty: "El nombre del plan no puede estar vacío",
+    updated: "Se actualizó \"{name}\"",
+    activate_before_delete: "Activa otro plan antes de eliminar este",
+    plan_no_longer_exists: "El plan de energía ya no existe",
+    deleted: "Se eliminó \"{name}\"",
+    opened_windows_editor: "Se abrió el editor de Windows para \"{name}\"",
+    opened_youtube: "Se abrió @fpsheaven en YouTube",
+    could_not_open_youtube: "No se pudo abrir YouTube: {error}",
+    defaults_already_available: "Los planes de energía predeterminados de Windows ya están disponibles",
+    import_already_running: "La importación del plan de energía de FPSHEAVEN ya está en curso",
+    downloading: "Descargando el plan de energía {label} de FPSHEAVEN...",
+    import_stopped: "La importación del plan de energía de FPSHEAVEN se detuvo inesperadamente",
+    imported_activated: "Se importó y activó el plan de energía {label} de FPSHEAVEN desde {path}",
+    replaced_suffix: "; se reemplazó \"{name}\"",
+    windows_reset_canceled: "Restablecimiento de los predeterminados de Windows cancelado",
+};
+
+const IT: Tr = Tr {
+    language_label: "Lingua",
+    refresh: "Aggiorna",
+    restore_defaults: "Ripristina predefinite",
+    import: "Importa",
+    export_all: "Esporta tutto",
+    download_fpsheaven: "Scarica la combinazione di FPSHEAVEN",
+    youtube: "YouTube",
+    selected: "Selezionata",
+    export: "Esporta",
+    delete: "Elimina",
+    power_plans: "Combinazioni di risparmio energia",
+    no_power_plans_found: "Nessuna combinazione di risparmio energia trovata",
+    select_a_power_plan: "Seleziona una combinazione di risparmio energia",
+    guid: "GUID",
+    name_and_description: "Nome e descrizione",
+    active_badge: "ATTIVA",
+    save: "Salva",
+    description_hint: "Descrizione",
+    activate: "Attiva",
+    duplicate: "Duplica",
+    activate_and_edit: "Attiva e modifica",
+    import_dialog_title: "Scarica la combinazione di risparmio energia di FPSHEAVEN",
+    import_dialog_prompt: "Ciao, importare INTEL o AMD?",
+    cancel: "Annulla",
+    reset_dialog_title: "Reimposta le combinazioni di risparmio energia di Windows",
+    reset_line_1: "Windows richiede una reimpostazione completa delle combinazioni per ripristinare quelle predefinite mancanti.",
+    reset_line_2: "Le combinazioni personalizzate verranno prima esportate e poi reimportate dopo la reimpostazione.",
+    reset_line_3: "Se una reimportazione non riesce, la cartella di backup verrà mantenuta e mostrata.",
+    original_error: "Errore originale",
+    reset_anyway: "Reimposta comunque",
+    delete_dialog_title: "Elimina combinazione di risparmio energia",
+    delete_confirm: "Eliminare \"{plan}\"?",
+    delete_removes_from_windows: "Questa operazione rimuove la combinazione da Windows.",
+    power_plan_filter: "Combinazione di risparmio energia",
+    import_power_plan_title: "Importa combinazione di risparmio energia",
+    export_power_plan_title: "Esporta combinazione di risparmio energia",
+    choose_export_folder_title: "Scegli la cartella di esportazione",
+    ready: "Pronto",
+    loaded_power_plans: "Combinazioni di risparmio energia caricate",
+    refreshed_power_plans: "Combinazioni di risparmio energia aggiornate",
+    import_busy: "L'importazione della combinazione FPSHEAVEN è in corso; attendi il completamento",
+    imported_success: "Importate {count} combinazioni di risparmio energia con successo",
+    imported_partial: "Importate {count} combinazioni di risparmio energia; {failed} non riuscite\n{errors}",
+    select_plan_first: "Seleziona prima una combinazione di risparmio energia",
+    exported_to: "Esportata \"{name}\" in {path}",
+    no_plans_to_export: "Nessuna combinazione di risparmio energia da esportare",
+    exported_all: "Esportate {count} combinazioni di risparmio energia in {path}",
+    exported_partial: "Esportate {count} combinazioni di risparmio energia; {failed} non riuscite\n{errors}",
+    activated: "Attivata \"{name}\"",
+    duplicated: "Duplicata \"{name}\"",
+    plan_name_empty: "Il nome della combinazione non può essere vuoto",
+    updated: "Aggiornata \"{name}\"",
+    activate_before_delete: "Attiva un'altra combinazione prima di eliminare questa",
+    plan_no_longer_exists: "La combinazione di risparmio energia non esiste più",
+    deleted: "Eliminata \"{name}\"",
+    opened_windows_editor: "Editor di Windows aperto per \"{name}\"",
+    opened_youtube: "Aperto @fpsheaven su YouTube",
+    could_not_open_youtube: "Impossibile aprire YouTube: {error}",
+    defaults_already_available: "Le combinazioni di risparmio energia predefinite di Windows sono già disponibili",
+    import_already_running: "L'importazione della combinazione FPSHEAVEN è già in corso",
+    downloading: "Download della combinazione FPSHEAVEN {label} in corso...",
+    import_stopped: "L'importazione della combinazione FPSHEAVEN si è interrotta inaspettatamente",
+    imported_activated: "Importata e attivata la combinazione FPSHEAVEN {label} da {path}",
+    replaced_suffix: "; sostituita \"{name}\"",
+    windows_reset_canceled: "Reimpostazione predefinita di Windows annullata",
+};
+
+const PT: Tr = Tr {
+    language_label: "Idioma",
+    refresh: "Atualizar",
+    restore_defaults: "Repor Predefinições",
+    import: "Importar",
+    export_all: "Exportar Tudo",
+    download_fpsheaven: "Transferir o plano de energia da FPSHEAVEN",
+    youtube: "YouTube",
+    selected: "Selecionado",
+    export: "Exportar",
+    delete: "Eliminar",
+    power_plans: "Planos de Energia",
+    no_power_plans_found: "Nenhum plano de energia encontrado",
+    select_a_power_plan: "Selecione um plano de energia",
+    guid: "GUID",
+    name_and_description: "Nome e Descrição",
+    active_badge: "ATIVO",
+    save: "Guardar",
+    description_hint: "Descrição",
+    activate: "Ativar",
+    duplicate: "Duplicar",
+    activate_and_edit: "Ativar e Editar",
+    import_dialog_title: "Transferir o Plano de Energia da FPSHEAVEN",
+    import_dialog_prompt: "Olá, importar INTEL ou AMD?",
+    cancel: "Cancelar",
+    reset_dialog_title: "Repor Planos de Energia do Windows",
+    reset_line_1: "O Windows precisa de uma reposição completa dos planos de energia para restaurar as predefinições em falta.",
+    reset_line_2: "Os planos personalizados serão exportados primeiro e depois reimportados após a reposição.",
+    reset_line_3: "Se alguma reimportação falhar, a pasta de cópia de segurança será mantida e apresentada.",
+    original_error: "Erro original",
+    reset_anyway: "Repor Mesmo Assim",
+    delete_dialog_title: "Eliminar Plano de Energia",
+    delete_confirm: "Eliminar \"{plan}\"?",
+    delete_removes_from_windows: "Isto remove o plano do Windows.",
+    power_plan_filter: "Plano de energia",
+    import_power_plan_title: "Importar plano de energia",
+    export_power_plan_title: "Exportar plano de energia",
+    choose_export_folder_title: "Escolher pasta de exportação",
+    ready: "Pronto",
+    loaded_power_plans: "Planos de energia carregados",
+    refreshed_power_plans: "Planos de energia atualizados",
+    import_busy: "A importação do plano de energia da FPSHEAVEN está em curso; aguarde que termine",
+    imported_success: "{count} plano(s) de energia importado(s) com êxito",
+    imported_partial: "{count} plano(s) de energia importado(s); {failed} falhou/falharam\n{errors}",
+    select_plan_first: "Selecione primeiro um plano de energia",
+    exported_to: "\"{name}\" exportado para {path}",
+    no_plans_to_export: "Nenhum plano de energia para exportar",
+    exported_all: "{count} plano(s) de energia exportado(s) para {path}",
+    exported_partial: "{count} plano(s) de energia exportado(s); {failed} falhou/falharam\n{errors}",
+    activated: "\"{name}\" ativado",
+    duplicated: "\"{name}\" duplicado",
+    plan_name_empty: "O nome do plano não pode estar vazio",
+    updated: "\"{name}\" atualizado",
+    activate_before_delete: "Ative outro plano antes de eliminar este",
+    plan_no_longer_exists: "O plano de energia já não existe",
+    deleted: "\"{name}\" eliminado",
+    opened_windows_editor: "Editor do Windows aberto para \"{name}\"",
+    opened_youtube: "@fpsheaven aberto no YouTube",
+    could_not_open_youtube: "Não foi possível abrir o YouTube: {error}",
+    defaults_already_available: "Os planos de energia predefinidos do Windows já estão disponíveis",
+    import_already_running: "A importação do plano de energia da FPSHEAVEN já está em curso",
+    downloading: "A transferir o plano de energia {label} da FPSHEAVEN...",
+    import_stopped: "A importação do plano de energia da FPSHEAVEN parou inesperadamente",
+    imported_activated: "Plano de energia {label} da FPSHEAVEN importado e ativado a partir de {path}",
+    replaced_suffix: "; substituiu \"{name}\"",
+    windows_reset_canceled: "Reposição das predefinições do Windows cancelada",
+};
+
+const TR: Tr = Tr {
+    language_label: "Dil",
+    refresh: "Yenile",
+    restore_defaults: "Varsayılanları Geri Yükle",
+    import: "İçe Aktar",
+    export_all: "Tümünü Dışa Aktar",
+    download_fpsheaven: "FPSHEAVEN güç planını indir",
+    youtube: "YouTube",
+    selected: "Seçili",
+    export: "Dışa Aktar",
+    delete: "Sil",
+    power_plans: "Güç Planları",
+    no_power_plans_found: "Güç planı bulunamadı",
+    select_a_power_plan: "Bir güç planı seçin",
+    guid: "GUID",
+    name_and_description: "Ad ve Açıklama",
+    active_badge: "ETKİN",
+    save: "Kaydet",
+    description_hint: "Açıklama",
+    activate: "Etkinleştir",
+    duplicate: "Çoğalt",
+    activate_and_edit: "Etkinleştir ve Düzenle",
+    import_dialog_title: "FPSHEAVEN Güç Planını İndir",
+    import_dialog_prompt: "Merhaba, INTEL mi yoksa AMD mi içe aktarılsın?",
+    cancel: "İptal",
+    reset_dialog_title: "Windows Güç Planlarını Sıfırla",
+    reset_line_1: "Windows'un eksik varsayılanları geri yüklemek için tam bir güç planı sıfırlaması yapması gerekiyor.",
+    reset_line_2: "Özel planlar önce dışa aktarılacak, ardından sıfırlamadan sonra yeniden içe aktarılacak.",
+    reset_line_3: "Herhangi bir yeniden içe aktarma başarısız olursa, yedek klasörü saklanır ve gösterilir.",
+    original_error: "Özgün hata",
+    reset_anyway: "Yine de Sıfırla",
+    delete_dialog_title: "Güç Planını Sil",
+    delete_confirm: "\"{plan}\" silinsin mi?",
+    delete_removes_from_windows: "Bu işlem planı Windows'tan kaldırır.",
+    power_plan_filter: "Güç planı",
+    import_power_plan_title: "Güç planını içe aktar",
+    export_power_plan_title: "Güç planını dışa aktar",
+    choose_export_folder_title: "Dışa aktarma klasörünü seçin",
+    ready: "Hazır",
+    loaded_power_plans: "Güç planları yüklendi",
+    refreshed_power_plans: "Güç planları yenilendi",
+    import_busy: "FPSHEAVEN güç planı içe aktarımı çalışıyor; bitmesini bekleyin",
+    imported_success: "{count} güç planı başarıyla içe aktarıldı",
+    imported_partial: "{count} güç planı içe aktarıldı; {failed} başarısız\n{errors}",
+    select_plan_first: "Önce bir güç planı seçin",
+    exported_to: "\"{name}\" {path} konumuna dışa aktarıldı",
+    no_plans_to_export: "Dışa aktarılacak güç planı yok",
+    exported_all: "{count} güç planı {path} konumuna dışa aktarıldı",
+    exported_partial: "{count} güç planı dışa aktarıldı; {failed} başarısız\n{errors}",
+    activated: "\"{name}\" etkinleştirildi",
+    duplicated: "\"{name}\" çoğaltıldı",
+    plan_name_empty: "Plan adı boş olamaz",
+    updated: "\"{name}\" güncellendi",
+    activate_before_delete: "Bunu silmeden önce başka bir planı etkinleştirin",
+    plan_no_longer_exists: "Güç planı artık mevcut değil",
+    deleted: "\"{name}\" silindi",
+    opened_windows_editor: "\"{name}\" için Windows düzenleyicisi açıldı",
+    opened_youtube: "YouTube'da @fpsheaven açıldı",
+    could_not_open_youtube: "YouTube açılamadı: {error}",
+    defaults_already_available: "Varsayılan Windows güç planları zaten mevcut",
+    import_already_running: "FPSHEAVEN güç planı içe aktarımı zaten çalışıyor",
+    downloading: "FPSHEAVEN {label} güç planı indiriliyor...",
+    import_stopped: "FPSHEAVEN güç planı içe aktarımı beklenmedik şekilde durdu",
+    imported_activated: "FPSHEAVEN {label} güç planı {path} konumundan içe aktarıldı ve etkinleştirildi",
+    replaced_suffix: "; \"{name}\" değiştirildi",
+    windows_reset_canceled: "Windows varsayılan sıfırlaması iptal edildi",
+};
+
+const DA: Tr = Tr {
+    language_label: "Sprog",
+    refresh: "Opdater",
+    restore_defaults: "Gendan standarder",
+    import: "Importer",
+    export_all: "Eksporter alle",
+    download_fpsheaven: "Download FPSHEAVENs strømstyringsplan",
+    youtube: "YouTube",
+    selected: "Valgt",
+    export: "Eksporter",
+    delete: "Slet",
+    power_plans: "Strømstyringsplaner",
+    no_power_plans_found: "Ingen strømstyringsplaner fundet",
+    select_a_power_plan: "Vælg en strømstyringsplan",
+    guid: "GUID",
+    name_and_description: "Navn og beskrivelse",
+    active_badge: "AKTIV",
+    save: "Gem",
+    description_hint: "Beskrivelse",
+    activate: "Aktiver",
+    duplicate: "Dupliker",
+    activate_and_edit: "Aktiver og rediger",
+    import_dialog_title: "Download FPSHEAVENs strømstyringsplan",
+    import_dialog_prompt: "Hej, importer INTEL eller AMD?",
+    cancel: "Annuller",
+    reset_dialog_title: "Nulstil Windows-strømstyringsplaner",
+    reset_line_1: "Windows kræver en fuld nulstilling af strømstyringsplaner for at gendanne de manglende standarder.",
+    reset_line_2: "Tilpassede planer eksporteres først og importeres derefter igen efter nulstillingen.",
+    reset_line_3: "Hvis en genimport mislykkes, bevares og vises sikkerhedskopimappen.",
+    original_error: "Oprindelig fejl",
+    reset_anyway: "Nulstil alligevel",
+    delete_dialog_title: "Slet strømstyringsplan",
+    delete_confirm: "Slet \"{plan}\"?",
+    delete_removes_from_windows: "Dette fjerner planen fra Windows.",
+    power_plan_filter: "Strømstyringsplan",
+    import_power_plan_title: "Importer strømstyringsplan",
+    export_power_plan_title: "Eksporter strømstyringsplan",
+    choose_export_folder_title: "Vælg eksportmappe",
+    ready: "Klar",
+    loaded_power_plans: "Strømstyringsplaner indlæst",
+    refreshed_power_plans: "Strømstyringsplaner opdateret",
+    import_busy: "Import af FPSHEAVEN-strømstyringsplan kører; vent på, at den bliver færdig",
+    imported_success: "Importerede {count} strømstyringsplan(er)",
+    imported_partial: "Importerede {count} strømstyringsplan(er); {failed} mislykkedes\n{errors}",
+    select_plan_first: "Vælg en strømstyringsplan først",
+    exported_to: "Eksporterede \"{name}\" til {path}",
+    no_plans_to_export: "Ingen strømstyringsplaner at eksportere",
+    exported_all: "Eksporterede {count} strømstyringsplan(er) til {path}",
+    exported_partial: "Eksporterede {count} strømstyringsplan(er); {failed} mislykkedes\n{errors}",
+    activated: "Aktiverede \"{name}\"",
+    duplicated: "Duplikerede \"{name}\"",
+    plan_name_empty: "Plannavn må ikke være tomt",
+    updated: "Opdaterede \"{name}\"",
+    activate_before_delete: "Aktiver en anden plan, før du sletter denne",
+    plan_no_longer_exists: "Strømstyringsplanen findes ikke længere",
+    deleted: "Slettede \"{name}\"",
+    opened_windows_editor: "Åbnede Windows-editor for \"{name}\"",
+    opened_youtube: "Åbnede @fpsheaven på YouTube",
+    could_not_open_youtube: "Kunne ikke åbne YouTube: {error}",
+    defaults_already_available: "Windows-standardstrømstyringsplaner er allerede tilgængelige",
+    import_already_running: "Import af FPSHEAVEN-strømstyringsplan kører allerede",
+    downloading: "Downloader FPSHEAVEN {label}-strømstyringsplan...",
+    import_stopped: "Import af FPSHEAVEN-strømstyringsplan stoppede uventet",
+    imported_activated: "Importerede og aktiverede FPSHEAVEN {label}-strømstyringsplan fra {path}",
+    replaced_suffix: "; erstattede \"{name}\"",
+    windows_reset_canceled: "Nulstilling af Windows-standarder annulleret",
+};
+
 struct PowerPlanApp {
+    language: Language,
     plans: Vec<PowerPlan>,
     selected_guid: Option<String>,
     rename_text: String,
@@ -214,7 +855,9 @@ impl PowerPlanApp {
         configure_fonts(&cc.egui_ctx);
         configure_style(&cc.egui_ctx);
 
+        let language = load_saved_language();
         let mut app = Self {
+            language,
             plans: Vec::new(),
             selected_guid: None,
             rename_text: String::new(),
@@ -223,11 +866,22 @@ impl PowerPlanApp {
             pending_fpsheaven_import: false,
             pending_default_reset_error: None,
             fpsheaven_import_job: None,
-            status: StatusMessage::info("Ready"),
+            status: StatusMessage::info(language.strings().ready),
         };
 
-        app.reload_with_status("Loaded power plans");
+        app.reload_with_status(app.tr().loaded_power_plans);
         app
+    }
+
+    fn tr(&self) -> &'static Tr {
+        self.language.strings()
+    }
+
+    fn set_language(&mut self, language: Language) {
+        if self.language != language {
+            self.language = language;
+            save_language(language);
+        }
     }
 
     fn reload(&mut self) -> Result<(), String> {
@@ -276,7 +930,7 @@ impl PowerPlanApp {
 
     fn block_if_fpsheaven_import_running(&mut self) -> bool {
         if self.fpsheaven_import_running() {
-            self.status = StatusMessage::info(FPSHEAVEN_IMPORT_BUSY_MESSAGE);
+            self.status = StatusMessage::info(self.tr().import_busy);
             true
         } else {
             false
@@ -298,8 +952,8 @@ impl PowerPlanApp {
         }
 
         let Some(paths) = FileDialog::new()
-            .add_filter("Power plan", &["pow"])
-            .set_title("Import power plan")
+            .add_filter(self.tr().power_plan_filter, &["pow"])
+            .set_title(self.tr().import_power_plan_title)
             .pick_files()
         else {
             return;
@@ -322,13 +976,18 @@ impl PowerPlanApp {
         let _ = self.reload();
 
         if errors.is_empty() {
-            self.status =
-                StatusMessage::success(format!("Imported {imported} power plan(s) successfully"));
+            self.status = StatusMessage::success(fill(
+                self.tr().imported_success,
+                &[("{count}", &imported.to_string())],
+            ));
         } else {
-            self.status = StatusMessage::error(format!(
-                "Imported {imported} power plan(s); {} failed\n{}",
-                errors.len(),
-                errors.join("\n")
+            self.status = StatusMessage::error(fill(
+                self.tr().imported_partial,
+                &[
+                    ("{count}", &imported.to_string()),
+                    ("{failed}", &errors.len().to_string()),
+                    ("{errors}", &errors.join("\n")),
+                ],
             ));
         }
     }
@@ -339,15 +998,15 @@ impl PowerPlanApp {
         }
 
         let Some(plan) = self.selected_plan().cloned() else {
-            self.status = StatusMessage::error("Select a power plan first");
+            self.status = StatusMessage::error(self.tr().select_plan_first);
             return;
         };
 
         let default_name = format!("{}.pow", sanitize_file_stem(&plan.name));
         let Some(path) = FileDialog::new()
-            .add_filter("Power plan", &["pow"])
+            .add_filter(self.tr().power_plan_filter, &["pow"])
             .set_file_name(&default_name)
-            .set_title("Export power plan")
+            .set_title(self.tr().export_power_plan_title)
             .save_file()
         else {
             return;
@@ -355,10 +1014,12 @@ impl PowerPlanApp {
 
         match export_power_plan(&plan.guid, &path) {
             Ok(()) => {
-                self.status = StatusMessage::success(format!(
-                    "Exported \"{}\" to {}",
-                    plan.name,
-                    path.display()
+                self.status = StatusMessage::success(fill(
+                    self.tr().exported_to,
+                    &[
+                        ("{name}", &plan.name),
+                        ("{path}", &path.display().to_string()),
+                    ],
                 ));
             }
             Err(error) => self.status = StatusMessage::error(error),
@@ -371,12 +1032,12 @@ impl PowerPlanApp {
         }
 
         if self.plans.is_empty() {
-            self.status = StatusMessage::error("No power plans to export");
+            self.status = StatusMessage::error(self.tr().no_plans_to_export);
             return;
         }
 
         let Some(folder) = FileDialog::new()
-            .set_title("Choose export folder")
+            .set_title(self.tr().choose_export_folder_title)
             .pick_folder()
         else {
             return;
@@ -395,15 +1056,21 @@ impl PowerPlanApp {
         }
 
         if errors.is_empty() {
-            self.status = StatusMessage::success(format!(
-                "Exported {exported} power plan(s) to {}",
-                folder.display()
+            self.status = StatusMessage::success(fill(
+                self.tr().exported_all,
+                &[
+                    ("{count}", &exported.to_string()),
+                    ("{path}", &folder.display().to_string()),
+                ],
             ));
         } else {
-            self.status = StatusMessage::error(format!(
-                "Exported {exported} power plan(s); {} failed\n{}",
-                errors.len(),
-                errors.join("\n")
+            self.status = StatusMessage::error(fill(
+                self.tr().exported_partial,
+                &[
+                    ("{count}", &exported.to_string()),
+                    ("{failed}", &errors.len().to_string()),
+                    ("{errors}", &errors.join("\n")),
+                ],
             ));
         }
     }
@@ -414,14 +1081,17 @@ impl PowerPlanApp {
         }
 
         let Some(plan) = self.selected_plan().cloned() else {
-            self.status = StatusMessage::error("Select a power plan first");
+            self.status = StatusMessage::error(self.tr().select_plan_first);
             return;
         };
 
         match set_active_plan(&plan.guid) {
             Ok(()) => {
                 let _ = self.reload();
-                self.status = StatusMessage::success(format!("Activated \"{}\"", plan.name));
+                self.status = StatusMessage::success(fill(
+                    self.tr().activated,
+                    &[("{name}", &plan.name)],
+                ));
             }
             Err(error) => self.status = StatusMessage::error(error),
         }
@@ -433,7 +1103,7 @@ impl PowerPlanApp {
         }
 
         let Some(plan) = self.selected_plan().cloned() else {
-            self.status = StatusMessage::error("Select a power plan first");
+            self.status = StatusMessage::error(self.tr().select_plan_first);
             return;
         };
 
@@ -443,7 +1113,10 @@ impl PowerPlanApp {
                 if let Some(guid) = new_guid {
                     self.select_plan(guid);
                 }
-                self.status = StatusMessage::success(format!("Duplicated \"{}\"", plan.name));
+                self.status = StatusMessage::success(fill(
+                    self.tr().duplicated,
+                    &[("{name}", &plan.name)],
+                ));
             }
             Err(error) => self.status = StatusMessage::error(error),
         }
@@ -455,13 +1128,13 @@ impl PowerPlanApp {
         }
 
         let Some(plan) = self.selected_plan().cloned() else {
-            self.status = StatusMessage::error("Select a power plan first");
+            self.status = StatusMessage::error(self.tr().select_plan_first);
             return;
         };
 
         let new_name = self.rename_text.trim();
         if new_name.is_empty() {
-            self.status = StatusMessage::error("Plan name cannot be empty");
+            self.status = StatusMessage::error(self.tr().plan_name_empty);
             return;
         }
 
@@ -473,7 +1146,10 @@ impl PowerPlanApp {
         match update_power_plan_metadata(&plan.guid, new_name, description) {
             Ok(()) => {
                 let _ = self.reload();
-                self.status = StatusMessage::success(format!("Updated \"{}\"", plan.name));
+                self.status = StatusMessage::success(fill(
+                    self.tr().updated,
+                    &[("{name}", &plan.name)],
+                ));
             }
             Err(error) => self.status = StatusMessage::error(error),
         }
@@ -485,12 +1161,12 @@ impl PowerPlanApp {
         }
 
         let Some(plan) = self.selected_plan().cloned() else {
-            self.status = StatusMessage::error("Select a power plan first");
+            self.status = StatusMessage::error(self.tr().select_plan_first);
             return;
         };
 
         if plan.active {
-            self.status = StatusMessage::error("Activate another plan before deleting this one");
+            self.status = StatusMessage::error(self.tr().activate_before_delete);
         } else {
             self.pending_delete_guid = Some(plan.guid);
         }
@@ -502,19 +1178,22 @@ impl PowerPlanApp {
         }
 
         let Some(plan) = self.plans.iter().find(|plan| plan.guid == guid).cloned() else {
-            self.status = StatusMessage::error("Power plan no longer exists");
+            self.status = StatusMessage::error(self.tr().plan_no_longer_exists);
             return;
         };
 
         if plan.active {
-            self.status = StatusMessage::error("Activate another plan before deleting this one");
+            self.status = StatusMessage::error(self.tr().activate_before_delete);
             return;
         }
 
         match delete_power_plan(&plan.guid) {
             Ok(()) => {
                 let _ = self.reload();
-                self.status = StatusMessage::success(format!("Deleted \"{}\"", plan.name));
+                self.status = StatusMessage::success(fill(
+                    self.tr().deleted,
+                    &[("{name}", &plan.name)],
+                ));
             }
             Err(error) => self.status = StatusMessage::error(error),
         }
@@ -526,15 +1205,17 @@ impl PowerPlanApp {
         }
 
         let Some(plan) = self.selected_plan().cloned() else {
-            self.status = StatusMessage::error("Select a power plan first");
+            self.status = StatusMessage::error(self.tr().select_plan_first);
             return;
         };
 
         match open_advanced_settings_for_plan(&plan.guid) {
             Ok(()) => {
                 let _ = self.reload();
-                self.status =
-                    StatusMessage::success(format!("Opened Windows editor for \"{}\"", plan.name));
+                self.status = StatusMessage::success(fill(
+                    self.tr().opened_windows_editor,
+                    &[("{name}", &plan.name)],
+                ));
             }
             Err(error) => self.status = StatusMessage::error(error),
         }
@@ -542,9 +1223,12 @@ impl PowerPlanApp {
 
     fn open_youtube_channel(&mut self) {
         match webbrowser::open(YOUTUBE_CHANNEL_URL) {
-            Ok(()) => self.status = StatusMessage::success("Opened @fpsheaven on YouTube"),
+            Ok(()) => self.status = StatusMessage::success(self.tr().opened_youtube),
             Err(error) => {
-                self.status = StatusMessage::error(format!("Could not open YouTube: {error}"))
+                self.status = StatusMessage::error(fill(
+                    self.tr().could_not_open_youtube,
+                    &[("{error}", &error.to_string())],
+                ))
             }
         }
     }
@@ -557,7 +1241,7 @@ impl PowerPlanApp {
         let missing_defaults = missing_default_power_plans(&self.plans);
 
         if missing_defaults.is_empty() {
-            self.status = StatusMessage::info("Default Windows power plans are already available");
+            self.status = StatusMessage::info(self.tr().defaults_already_available);
             return;
         }
 
@@ -567,9 +1251,7 @@ impl PowerPlanApp {
             Ok(message) => Ok(message),
             Err(error) if has_custom_plans => {
                 self.pending_default_reset_error = Some(error);
-                self.status = StatusMessage::info(
-                    "A full Windows power plan reset is required to restore those defaults",
-                );
+                self.status = StatusMessage::info(self.tr().reset_line_1);
                 return;
             }
             Err(_error) => {
@@ -628,7 +1310,7 @@ impl PowerPlanApp {
 
     fn start_fpsheaven_power_plan_import(&mut self, plan_kind: FpsheavenPowerPlanKind) {
         if self.fpsheaven_import_job.is_some() {
-            self.status = StatusMessage::info("FPSHEAVEN power plan import is already running");
+            self.status = StatusMessage::info(self.tr().import_already_running);
             return;
         }
 
@@ -641,9 +1323,9 @@ impl PowerPlanApp {
             plan_kind,
             receiver,
         });
-        self.status = StatusMessage::info(format!(
-            "Downloading FPSHEAVEN {} power plan...",
-            plan_kind.label()
+        self.status = StatusMessage::info(fill(
+            self.tr().downloading,
+            &[("{label}", plan_kind.label())],
         ));
     }
 
@@ -663,8 +1345,7 @@ impl PowerPlanApp {
             }
             Err(TryRecvError::Disconnected) => {
                 self.fpsheaven_import_job = None;
-                self.status =
-                    StatusMessage::error("FPSHEAVEN power plan import stopped unexpectedly");
+                self.status = StatusMessage::error(self.tr().import_stopped);
             }
         }
     }
@@ -681,13 +1362,18 @@ impl PowerPlanApp {
                     self.select_plan(result.guid);
                 }
 
-                let mut message = format!(
-                    "Imported and activated FPSHEAVEN {} power plan from {}",
-                    plan_kind.label(),
-                    result.plan_path.display()
+                let mut message = fill(
+                    self.tr().imported_activated,
+                    &[
+                        ("{label}", plan_kind.label()),
+                        ("{path}", &result.plan_path.display().to_string()),
+                    ],
                 );
                 if let Some(replaced_plan_name) = result.replaced_active_plan_name {
-                    message.push_str(&format!("; replaced \"{replaced_plan_name}\""));
+                    message.push_str(&fill(
+                        self.tr().replaced_suffix,
+                        &[("{name}", &replaced_plan_name)],
+                    ));
                 }
                 self.status = StatusMessage::success(message);
             }
@@ -703,15 +1389,24 @@ impl PowerPlanApp {
             .unwrap_or(false);
         let fpsheaven_import_running = self.fpsheaven_import_running();
         let can_run_power_plan_action = !fpsheaven_import_running;
+        let t = self.tr();
 
         ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
 
+        ui.allocate_ui_with_layout(
+            Vec2::new(ui.available_width(), TOOLBAR_BUTTON_HEIGHT),
+            Layout::right_to_left(Align::Center),
+            |ui| {
+                self.draw_language_selector(ui);
+            },
+        );
+
         ui.horizontal_wrapped(|ui| {
-            if toolbar_enabled_button(ui, can_run_power_plan_action, "Refresh", 86.0).clicked() {
-                self.reload_with_status("Refreshed power plans");
+            if toolbar_enabled_button(ui, can_run_power_plan_action, t.refresh, 86.0).clicked() {
+                self.reload_with_status(t.refreshed_power_plans);
             }
 
-            if toolbar_enabled_button(ui, can_run_power_plan_action, "Restore Defaults", 132.0)
+            if toolbar_enabled_button(ui, can_run_power_plan_action, t.restore_defaults, 132.0)
                 .clicked()
             {
                 self.enable_default_windows_plans();
@@ -719,14 +1414,14 @@ impl PowerPlanApp {
 
             toolbar_separator(ui);
 
-            if toolbar_enabled_button(ui, can_run_power_plan_action, "Import", 86.0).clicked() {
+            if toolbar_enabled_button(ui, can_run_power_plan_action, t.import, 86.0).clicked() {
                 self.import_plans();
             }
 
             if toolbar_enabled_button(
                 ui,
                 can_run_power_plan_action && !self.plans.is_empty(),
-                "Export All",
+                t.export_all,
                 104.0,
             )
             .clicked()
@@ -736,18 +1431,13 @@ impl PowerPlanApp {
 
             toolbar_separator(ui);
 
-            if toolbar_enabled_button(
-                ui,
-                can_run_power_plan_action,
-                "Download FPSHEAVEN's power plan",
-                270.0,
-            )
-            .clicked()
+            if toolbar_enabled_button(ui, can_run_power_plan_action, t.download_fpsheaven, 270.0)
+                .clicked()
             {
                 self.pending_fpsheaven_import = true;
             }
 
-            if toolbar_button(ui, "YouTube", 92.0).clicked() {
+            if toolbar_button(ui, t.youtube, 92.0).clicked() {
                 self.open_youtube_channel();
             }
         });
@@ -755,12 +1445,12 @@ impl PowerPlanApp {
         ui.add_space(2.0);
 
         ui.horizontal_wrapped(|ui| {
-            toolbar_label(ui, "Selected");
+            toolbar_label(ui, t.selected);
 
             if toolbar_enabled_button(
                 ui,
                 can_run_power_plan_action && has_selection,
-                "Export",
+                t.export,
                 92.0,
             )
             .clicked()
@@ -771,7 +1461,7 @@ impl PowerPlanApp {
             if toolbar_enabled_button(
                 ui,
                 can_run_power_plan_action && can_delete_selected,
-                "Delete",
+                t.delete,
                 92.0,
             )
             .clicked()
@@ -781,22 +1471,37 @@ impl PowerPlanApp {
         });
     }
 
+    fn draw_language_selector(&mut self, ui: &mut Ui) {
+        let t = self.tr();
+        let mut selected = self.language;
+        egui::ComboBox::from_id_salt("language_selector")
+            .selected_text(selected.native_name())
+            .show_ui(ui, |ui| {
+                for language in Language::ALL {
+                    ui.selectable_value(&mut selected, language, language.native_name());
+                }
+            });
+        ui.label(RichText::new(t.language_label).small());
+        self.set_language(selected);
+    }
+
     fn draw_fpsheaven_import_dialog(&mut self, ctx: &Context) {
         if !self.pending_fpsheaven_import {
             return;
         }
 
+        let t = self.tr();
         let mut selected_kind = None;
         let mut cancel = false;
 
-        egui::Window::new("Download FPSHEAVEN's Power Plan")
+        egui::Window::new(t.import_dialog_title)
             .collapsible(false)
             .resizable(false)
             .fixed_size(Vec2::new(376.0, 132.0))
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.set_width(352.0);
-                ui.label("Hi, import INTEL or AMD?");
+                ui.label(t.import_dialog_prompt);
                 ui.add_space(18.0);
                 ui.horizontal(|ui| {
                     if ui.button("INTEL").clicked() {
@@ -807,7 +1512,7 @@ impl PowerPlanApp {
                         selected_kind = Some(FpsheavenPowerPlanKind::Amd);
                     }
 
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(t.cancel).clicked() {
                         cancel = true;
                     }
                 });
@@ -826,29 +1531,30 @@ impl PowerPlanApp {
             return;
         };
 
+        let t = self.tr();
         let can_run_power_plan_action = !self.fpsheaven_import_running();
         let mut cancel = false;
         let mut reset = false;
 
-        egui::Window::new("Reset Windows Power Plans")
+        egui::Window::new(t.reset_dialog_title)
             .collapsible(false)
             .resizable(false)
             .fixed_size(Vec2::new(460.0, 234.0))
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.set_width(436.0);
-                ui.label("Windows needs a full power-plan reset to restore the missing defaults.");
-                ui.label("Custom plans will be exported first, then re-imported after the reset.");
-                ui.label("If any re-import fails, the backup folder will be kept and shown.");
+                ui.label(t.reset_line_1);
+                ui.label(t.reset_line_2);
+                ui.label(t.reset_line_3);
                 ui.add_space(12.0);
-                ui.label(RichText::new("Original error").small().strong());
+                ui.label(RichText::new(t.original_error).small().strong());
                 ui.label(RichText::new(error).small());
                 ui.add_space(14.0);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if ui
                         .add_enabled(
                             can_run_power_plan_action,
-                            Button::new(RichText::new("Reset Anyway").color(Color32::WHITE))
+                            Button::new(RichText::new(t.reset_anyway).color(Color32::WHITE))
                                 .fill(Color32::from_rgb(190, 55, 45)),
                         )
                         .clicked()
@@ -856,7 +1562,7 @@ impl PowerPlanApp {
                         reset = true;
                     }
 
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(t.cancel).clicked() {
                         cancel = true;
                     }
                 });
@@ -867,16 +1573,17 @@ impl PowerPlanApp {
             self.reset_default_windows_plans_anyway();
         } else if cancel {
             self.pending_default_reset_error = None;
-            self.status = StatusMessage::info("Windows default reset canceled");
+            self.status = StatusMessage::info(self.tr().windows_reset_canceled);
         }
     }
 
     fn draw_plan_list(&mut self, ui: &mut Ui) {
-        ui.heading("Power Plans");
+        let t = self.tr();
+        ui.heading(t.power_plans);
         ui.add_space(6.0);
 
         if self.plans.is_empty() {
-            ui.label("No power plans found");
+            ui.label(t.no_power_plans_found);
             return;
         }
 
@@ -894,7 +1601,7 @@ impl PowerPlanApp {
 
                             if plan.active {
                                 ui.label(
-                                    RichText::new("ACTIVE")
+                                    RichText::new(t.active_badge)
                                         .small()
                                         .monospace()
                                         .color(Color32::from_rgb(38, 166, 91)),
@@ -915,9 +1622,10 @@ impl PowerPlanApp {
     }
 
     fn draw_details(&mut self, ui: &mut Ui) {
+        let t = self.tr();
         let Some(plan) = self.selected_plan().cloned() else {
             ui.centered_and_justified(|ui| {
-                ui.label("Select a power plan");
+                ui.label(t.select_a_power_plan);
             });
             return;
         };
@@ -927,7 +1635,7 @@ impl PowerPlanApp {
             ui.heading(&plan.name);
             if plan.active {
                 ui.label(
-                    RichText::new("ACTIVE")
+                    RichText::new(t.active_badge)
                         .small()
                         .monospace()
                         .color(Color32::from_rgb(38, 166, 91)),
@@ -937,7 +1645,7 @@ impl PowerPlanApp {
 
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            ui.label("GUID");
+            ui.label(t.guid);
             ui.monospace(&plan.guid);
         });
 
@@ -945,7 +1653,7 @@ impl PowerPlanApp {
         ui.separator();
         ui.add_space(14.0);
 
-        ui.label(RichText::new("Name and Description").strong());
+        ui.label(RichText::new(t.name_and_description).strong());
         ui.horizontal(|ui| {
             let available = (ui.available_width() - 112.0).max(160.0);
             ui.add_sized(
@@ -958,7 +1666,7 @@ impl PowerPlanApp {
             let can_save = can_run_power_plan_action
                 && !self.rename_text.trim().is_empty()
                 && metadata_changed;
-            if ui.add_enabled(can_save, Button::new("Save")).clicked() {
+            if ui.add_enabled(can_save, Button::new(t.save)).clicked() {
                 self.save_selected_plan_metadata();
             }
         });
@@ -966,7 +1674,7 @@ impl PowerPlanApp {
         ui.add_sized(
             Vec2::new(ui.available_width(), 92.0),
             TextEdit::multiline(&mut self.description_text)
-                .hint_text("Description")
+                .hint_text(t.description_hint)
                 .desired_rows(4),
         );
 
@@ -978,7 +1686,7 @@ impl PowerPlanApp {
             if ui
                 .add_enabled(
                     can_run_power_plan_action && !plan.active,
-                    Button::new("Activate"),
+                    Button::new(t.activate),
                 )
                 .clicked()
             {
@@ -986,21 +1694,21 @@ impl PowerPlanApp {
             }
 
             if ui
-                .add_enabled(can_run_power_plan_action, Button::new("Duplicate"))
+                .add_enabled(can_run_power_plan_action, Button::new(t.duplicate))
                 .clicked()
             {
                 self.duplicate_selected_plan();
             }
 
             if ui
-                .add_enabled(can_run_power_plan_action, Button::new("Activate & Edit"))
+                .add_enabled(can_run_power_plan_action, Button::new(t.activate_and_edit))
                 .clicked()
             {
                 self.open_windows_editor();
             }
 
             if ui
-                .add_enabled(can_run_power_plan_action, Button::new("Export"))
+                .add_enabled(can_run_power_plan_action, Button::new(t.export))
                 .clicked()
             {
                 self.export_selected_plan();
@@ -1009,7 +1717,7 @@ impl PowerPlanApp {
             if ui
                 .add_enabled(
                     can_run_power_plan_action && !plan.active,
-                    Button::new("Delete"),
+                    Button::new(t.delete),
                 )
                 .clicked()
             {
@@ -1030,25 +1738,26 @@ impl PowerPlanApp {
             .map(|plan| plan.name.clone())
             .unwrap_or_else(|| "Selected plan".to_owned());
 
+        let t = self.tr();
         let can_run_power_plan_action = !self.fpsheaven_import_running();
         let mut cancel = false;
         let mut delete = false;
 
-        egui::Window::new("Delete Power Plan")
+        egui::Window::new(t.delete_dialog_title)
             .collapsible(false)
             .resizable(false)
             .fixed_size(Vec2::new(340.0, 136.0))
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.set_width(316.0);
-                ui.label(format!("Delete \"{plan_name}\"?"));
-                ui.label("This removes the plan from Windows.");
+                ui.label(fill(t.delete_confirm, &[("{plan}", &plan_name)]));
+                ui.label(t.delete_removes_from_windows);
                 ui.add_space(14.0);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if ui
                         .add_enabled(
                             can_run_power_plan_action,
-                            Button::new(RichText::new("Delete").color(Color32::WHITE))
+                            Button::new(RichText::new(t.delete).color(Color32::WHITE))
                                 .fill(Color32::from_rgb(190, 55, 45)),
                         )
                         .clicked()
@@ -1056,7 +1765,7 @@ impl PowerPlanApp {
                         delete = true;
                     }
 
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(t.cancel).clicked() {
                         cancel = true;
                     }
                 });
@@ -2226,6 +2935,54 @@ mod tests {
         assert!(verify_zip_file(&missing_path).is_err());
 
         let _ = fs::remove_dir_all(folder);
+    }
+
+    #[test]
+    fn fill_replaces_named_placeholders() {
+        assert_eq!(
+            fill(
+                "Exported \"{name}\" to {path}",
+                &[("{name}", "Balanced"), ("{path}", r"C:\out")]
+            ),
+            "Exported \"Balanced\" to C:\\out"
+        );
+    }
+
+    #[test]
+    fn every_language_preserves_placeholders_and_round_trips_code() {
+        for language in Language::ALL {
+            assert_eq!(Language::from_code(language.code()), Some(language));
+
+            let t = language.strings();
+            assert!(!t.refresh.is_empty(), "{:?} refresh empty", language);
+            assert!(!t.power_plans.is_empty(), "{:?} power_plans empty", language);
+            assert!(t.activated.contains("{name}"), "{:?} activated", language);
+            assert!(t.deleted.contains("{name}"), "{:?} deleted", language);
+            assert!(t.updated.contains("{name}"), "{:?} updated", language);
+            assert!(t.duplicated.contains("{name}"), "{:?} duplicated", language);
+            assert!(t.delete_confirm.contains("{plan}"), "{:?} delete_confirm", language);
+            assert!(t.imported_success.contains("{count}"), "{:?} imported_success", language);
+            assert!(t.downloading.contains("{label}"), "{:?} downloading", language);
+            assert!(t.replaced_suffix.contains("{name}"), "{:?} replaced_suffix", language);
+            assert!(t.could_not_open_youtube.contains("{error}"), "{:?} youtube", language);
+            assert!(
+                t.exported_to.contains("{name}") && t.exported_to.contains("{path}"),
+                "{:?} exported_to",
+                language
+            );
+            assert!(
+                t.imported_activated.contains("{label}") && t.imported_activated.contains("{path}"),
+                "{:?} imported_activated",
+                language
+            );
+            assert!(
+                t.imported_partial.contains("{count}")
+                    && t.imported_partial.contains("{failed}")
+                    && t.imported_partial.contains("{errors}"),
+                "{:?} imported_partial",
+                language
+            );
+        }
     }
 
     #[test]
